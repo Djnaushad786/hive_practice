@@ -1,6 +1,5 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -10,160 +9,141 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
+  List myData = [];
+  TextEditingController productController = TextEditingController();
+  TextEditingController priceController = TextEditingController();
+  var myBox = Hive.box('MyBox');
+
   @override
   void initState() {
     super.initState();
     getProduct();
   }
-  var myBox=Hive.box('MyBox');
-  TextEditingController product=TextEditingController();
-  TextEditingController price=TextEditingController();
-  List myData=[];
-  @override
-  Widget build(BuildContext context) {
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.orange,
-        title: Text('Hive DataBase'),
-      ),
-      floatingActionButton: FloatingActionButton(child : Icon(Icons.add),backgroundColor: Colors.orange, onPressed: (){
-      showBottomSheet();
-      },
-      ),
-      body: ListView.builder(
-          itemCount:  myData.length,
-          itemBuilder: (context,index){
-            return Padding(padding: EdgeInsets.only(left: 8,right: 8,top: 3),
-            child: Card(
-                elevation: 10,
-              shadowColor: Colors.orange,
-              child: ListTile(
-                title: Text(myData[index]['product']),
-                subtitle: Text(myData[index]['price']),
-                trailing: SizedBox(width: 100,
-                child: Row(children: [
-                  IconButton(onPressed: (){
-                    product.text=myData[index]['product'];
-                    price.text=myData[index]['price'];
-                    updateShowBottomSheet(myData[index]['key']);
-
-                  }, icon: Icon(Icons.edit)),
-                  IconButton(onPressed: (){
-                    deleteProduct(myData[index]['key']);
-                  }, icon: Icon(Icons.delete)),
-                ],),),
-              ),
-            ),);
-
-      }),
-    );
+  void getProduct() {
+    myData = myBox.keys.map((key) {
+      final res = myBox.get(key);
+      if (res is Map) {
+        return {
+          'key': key,
+          'product': res['product'],
+          'price': res['price']
+        };
+      } else {
+        return {
+          'key': key,
+          'product': 'Invalid Data',
+          'price': 'Invalid Data'
+        };
+      }
+    }).toList();
+    setState(() {});
   }
 
-
-  void showBottomSheet(){
-    showModalBottomSheet(context: context, builder: (context)=>
-        Container(
-          child: Padding(padding: EdgeInsets.all(10),
-          child: Column(
-            children: [
-              TextField(
-                controller: product,
-                decoration: InputDecoration(
-                    hintText: 'Enter Product',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10))),
-              ),
-              SizedBox(height: 10,),
-              TextField(
-                controller: price,
-                decoration: InputDecoration(
-                    hintText: 'Enter price',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10))),
-              ),
-              SizedBox(height: 10,),
-              ElevatedButton(onPressed: (){
-                Map newProduct={
-                  'product':product.text,
-                  'price':price.text,
-                };
-                addProduct(newProduct);
-                getProduct();
-                product.clear();
-                price.clear();
-
-              },
-                  child: Text('Add Product')),
-            ],
-          ),),
-        )
-    );
-  }
-  void addProduct(data)async{
-    await myBox.add(data);
-    print(myBox.values);
-  }
-  void getProduct(){
-    myData=myBox.keys.map((a){
-      var res=myBox.get(a);
-     return{
-       'key':a,
-       'product':res['product'],
-       'price':res['price']
-     };
-
-    }
-
-    ).toList();
-    setState(() {
-
-    });
-  }
-  void deleteProduct(key)async{
-    await  myBox.delete(key);
+  void addProduct() {
+    final newProduct = {
+      'product': productController.text,
+      'price': priceController.text,
+    };
+    myBox.add(newProduct);
+    productController.clear();
+    priceController.clear();
     getProduct();
   }
-  void updateShowBottomSheet(key){
-    showModalBottomSheet(context: context, builder: (context)=>
-        Container(
-          child: Padding(padding: EdgeInsets.all(10),
-            child: Column(
-              children: [
-                TextField(
-                  controller: product,
-                  decoration: InputDecoration(
-                      hintText: 'Enter Product',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10))),
-                ),
-                SizedBox(height: 10,),
-                TextField(
-                  controller: price,
-                  decoration: InputDecoration(
-                      hintText: 'Enter price',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10))),
-                ),
-                SizedBox(height: 10,),
-                ElevatedButton(onPressed: (){
-                  Map newProduct={
-                    'product':product.text,
-                    'price':price.text,
-                  };
-                  updateProduct(key, newProduct);
-                  getProduct();
-                  product.clear();
-                  price.clear();
 
-                }, child: Text('update Product')),
-              ],
-            ),),
-        )
-    );
+  void deleteProduct(key) async {
+    await myBox.delete(key);
+    getProduct();
   }
-  void   updateProduct(key ,data)async{
+
+  void updateProduct(key, data) async {
     await myBox.put(key, data);
     getProduct();
+  }
+
+  void showBottomSheet({String? key}) {
+    if (key != null) {
+      final existingProduct = myBox.get(key);
+      if (existingProduct is Map) {
+        productController.text = existingProduct['product'] ?? '';
+        priceController.text = existingProduct['price'] ?? '';
+      }
+    } else {
+      productController.clear();
+      priceController.clear();
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: productController,
+              decoration: InputDecoration(labelText: 'Product'),
+            ),
+            SizedBox(height: 10),
+            TextField(
+              controller: priceController,
+              decoration: InputDecoration(labelText: 'Price'),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                if (key != null) {
+                  updateProduct(key, {
+                    'product': productController.text,
+                    'price': priceController.text,
+                  });
+                } else {
+                  addProduct();
+                }
+                Navigator.pop(context);
+              },
+              child: Text(key != null ? 'Update Product' : 'Add Product'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Hive Database')),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () => showBottomSheet(),
+      ),
+      body: myData.isEmpty
+          ? Center(child: Text('No Products Available'))
+          : ListView.builder(
+        itemCount: myData.length,
+        itemBuilder: (context, index) {
+          return Card(
+            child: ListTile(
+              title: Text(myData[index]['product']),
+              subtitle: Text(myData[index]['price']),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () => showBottomSheet(key: myData[index]['key']),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () => deleteProduct(myData[index]['key']),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
